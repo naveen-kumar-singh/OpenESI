@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EtherCAT ESI Visual Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent: #38bdf8;
+      --accent-green: #4ade80;
+      --accent-orange: #fb923c;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+    }
+    .upload-box {
+      border: 2px dashed var(--card-border);
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      background: var(--card-bg);
+      cursor: pointer;
+      margin-bottom: 2rem;
+      transition: all 0.2s ease;
+    }
+    .upload-box:hover {
+      border-color: var(--accent);
+      background: #26334d;
+    }
+    input[type="file"] { display: none; }
+
+    /* Dashboard Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0;
+    }
+
+    .device-icon {
+      width: 32px;
+      height: 28px;
+      image-rendering: pixelated;
+      background: #334155;
+      padding: 2px;
+      border-radius: 4px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-val {
+      font-weight: 500;
+      font-family: monospace;
+    }
+
+    /* Timeout Pills */
+    .timeout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .timeout-pill {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      padding: 0.6rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .timeout-pill .val {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--accent-green);
+    }
+    .timeout-pill .lbl {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* PDO Memory Visualizer */
+    .pdo-block {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .pdo-header {
+      font-weight: bold;
+      color: var(--accent-orange);
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+    .pdo-sub-header {
+      font-size: 0.75rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      font-family: monospace;
+    }
+    .entry-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .entry-box {
+      background: var(--card-bg);
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.75rem;
+      border-radius: 0 4px 4px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+    .badge {
+      background: #0284c7;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+    th {
+      color: var(--accent);
+      background: #0f172a;
+    }
+    
+    /* SubItem styling in Object Dictionary */
+    tr.sub-item-row {
+      background-color: rgba(15, 23, 42, 0.4);
+    }
+    tr.sub-item-row td {
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+      padding-top: 0.4rem;
+      padding-bottom: 0.4rem;
+    }
+    .sub-tree-prefix {
+      color: var(--text-muted);
+      font-family: monospace;
+      margin-right: 6px;
+    }
+    .fmmu-tag {
+      display: inline-block;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>EtherCAT ESI Visualizer</h1>
+  <p class="subtitle">Upload an ESI XML file to generate a hardware overview dashboard.</p>
+
+  <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+    <strong style="color: var(--accent);">Click to select ESI XML file</strong> or drop it here
+    <input type="file" id="fileInput" accept=".xml">
+  </div>
+
+  <div id="dashboard" style="display: none;">
+    <!-- Row 1: Overview Cards -->
+    <div class="grid">
+      
+      <!-- Vendor Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Vendor Information</h3>
+          <img id="vendorIcon" class="device-icon" alt="Vendor Icon" style="display:none;" />
+        </div>
+        <div class="info-row">
+          <span class="info-label">Name:</span>
+          <span class="info-val" id="vendorName">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Vendor ID:</span>
+          <span class="info-val" id="vendorId">-</span>
+        </div>
+      </div>
+
+      <!-- Device Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Device Profile</h3>
+          <img id="groupIcon" class="device-icon" alt="Group Icon" style="display:none;" />
+        </div>
+        <div class="info-row">
+          <span class="info-label">Device Name:</span>
+          <span class="info-val" id="deviceName">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Product Code:</span>
+          <span class="info-val" id="productCode">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Revision No:</span>
+          <span class="info-val" id="revisionNo">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Physics:</span>
+          <span class="info-val" id="devicePhysics">-</span>
+        </div>
+      </div>
+
+      <!-- StateMachine Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">State Machine Timeouts</h3>
+        </div>
+        <div class="timeout-grid">
+          <div class="timeout-pill">
+            <div class="val" id="preopTimeout">0 ms</div>
+            <div class="lbl">Pre-Op</div>
+          </div>
+          <div class="timeout-pill">
+            <div class="val" id="safeopTimeout">0 ms</div>
+            <div class="lbl">Safe-Op</div>
+          </div>
+          <div class="timeout-pill">
+            <div class="val" id="backInitTimeout">0 ms</div>
+            <div class="lbl">Back to Init</div>
+          </div>
+          <div class="timeout-pill">
+            <div class="val" id="backSafeopTimeout">0 ms</div>
+            <div class="lbl">Back to Safe-Op</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Row 2: SyncManager & FMMU Configuration -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">SyncManager (SM) & FMMU Configuration</h3>
+        <div id="fmmuContainer"></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>SM Channel</th>
+            <th>Type / Name</th>
+            <th>Direction & Purpose</th>
+            <th>Start Addr</th>
+            <th>Default Size</th>
+            <th>Control Byte</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="smTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Row 3: Process Data Objects (PDOs) Visual Memory -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">TxPDO Memory Mapping (Inputs: Slave → Master)</h3>
+        </div>
+        <div id="txPdoContainer"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">RxPDO Memory Mapping (Outputs: Master → Slave)</h3>
+        </div>
+        <div id="rxPdoContainer"></div>
+      </div>
+    </div>
+
+    <!-- Row 4: CoE / SDO Object Dictionary -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Object Dictionary (CoE / SDOs)</h3>
+      </div>
+      <div style="max-height: 450px; overflow-y: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Index : Sub</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Bit Size</th>
+              <th>Default Value</th>
+              <th>Flags</th>
+            </tr>
+          </thead>
+          <tbody id="sdoTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      parseAndRenderESI(event.target.result);
+    };
+    reader.readAsText(file);
+  });
+
+  function hexToBase64Bmp(hexStr) {
+    if (!hexStr || hexStr.length < 10) return null;
+    try {
+      const bytes = new Uint8Array(hexStr.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return 'data:image/bmp;base64,' + btoa(binary);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function parseAndRenderESI(xmlString) {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlString, "text/xml");
+
+    // Vendor Data
+    const vendor = xml.querySelector('Vendor');
+    document.getElementById('vendorName').textContent = vendor?.querySelector('Name')?.textContent || 'N/A';
+    document.getElementById('vendorId').textContent = vendor?.querySelector('Id')?.textContent || 'N/A';
+    
+    const vendorImgHex = vendor?.querySelector('ImageData16x14')?.textContent?.trim();
+    const vendorImgSrc = hexToBase64Bmp(vendorImgHex);
+    const vendorImgEl = document.getElementById('vendorIcon');
+    if (vendorImgSrc) {
+      vendorImgEl.src = vendorImgSrc;
+      vendorImgEl.style.display = 'block';
+    } else {
+      vendorImgEl.style.display = 'none';
+    }
+
+    // Device Data
+    const groupImgHex = xml.querySelector('Group ImageData16x14')?.textContent?.trim();
+    const groupImgSrc = hexToBase64Bmp(groupImgHex);
+    const groupImgEl = document.getElementById('groupIcon');
+    if (groupImgSrc) {
+      groupImgEl.src = groupImgSrc;
+      groupImgEl.style.display = 'block';
+    } else {
+      groupImgEl.style.display = 'none';
+    }
+
+    const device = xml.querySelector('Device');
+    document.getElementById('deviceName').textContent = device?.querySelector('Name')?.textContent || 'N/A';
+    document.getElementById('devicePhysics').textContent = device?.getAttribute('Physics') || 'N/A';
+    
+    const typeNode = device?.querySelector('Type');
+    document.getElementById('productCode').textContent = typeNode?.getAttribute('ProductCode') || 'N/A';
+    document.getElementById('revisionNo').textContent = typeNode?.getAttribute('RevisionNo') || 'N/A';
+
+    // Timeouts
+    const timeouts = xml.querySelector('StateMachine Timeout');
+    document.getElementById('preopTimeout').textContent = (timeouts?.querySelector('PreopTimeout')?.textContent || '0') + ' ms';
+    document.getElementById('safeopTimeout').textContent = (timeouts?.querySelector('SafeopOpTimeout')?.textContent || '0') + ' ms';
+    document.getElementById('backInitTimeout').textContent = (timeouts?.querySelector('BackToInitTimeout')?.textContent || '0') + ' ms';
+    document.getElementById('backSafeopTimeout').textContent = (timeouts?.querySelector('BackToSafeopTimeout')?.textContent || '0') + ' ms';
+
+    renderSyncManagers(xml);
+    renderPdoBlocks(xml, 'TxPdo', 'txPdoContainer');
+    renderPdoBlocks(xml, 'RxPdo', 'rxPdoContainer');
+    renderObjects(xml);
+
+    document.getElementById('dashboard').style.display = 'block';
+  }
+
+  function getDirectionText(index, name) {
+    const lowerName = name.toLowerCase();
+    if (index === 0 || lowerName.includes('mboxout')) return 'Master → Slave (Mailbox / SDO Request)';
+    if (index === 1 || lowerName.includes('mboxin'))  return 'Slave → Master (Mailbox / SDO Response)';
+    if (index === 2 || lowerName.includes('output'))  return 'Master → Slave (Process Outputs / RxPDO)';
+    if (index === 3 || lowerName.includes('input'))   return 'Slave → Master (Process Inputs / TxPDO)';
+    return 'User Configured SM Channel';
+  }
+
+  function renderSyncManagers(xml) {
+    const smTableBody = document.getElementById('smTableBody');
+    const fmmuContainer = document.getElementById('fmmuContainer');
+    smTableBody.innerHTML = '';
+    fmmuContainer.innerHTML = '';
+
+    const fmmus = Array.from(xml.querySelectorAll('Fmmu'));
+    fmmus.forEach(fmmu => {
+      fmmuContainer.innerHTML += `<span class="fmmu-tag">FMMU: ${fmmu.textContent}</span>`;
+    });
+
+    const sms = Array.from(xml.querySelectorAll('Sm'));
+    if (!sms.length) {
+      smTableBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted)">No SyncManager tags found.</td></tr>';
+      return;
+    }
+
+    sms.forEach((sm, index) => {
+      const name = sm.textContent?.trim() || `SM${index}`;
+      const startAddr = sm.getAttribute('StartAddress') || '-';
+      const defaultSize = sm.getAttribute('DefaultSize') || '-';
+      const controlByte = sm.getAttribute('ControlByte') || '-';
+      const enabled = sm.getAttribute('Enable') === '1' ? 'Enabled' : 'Disabled';
+      const direction = getDirectionText(index, name);
+
+      smTableBody.innerHTML += `
+        <tr>
+          <td style="font-family: monospace; font-weight: bold; color: var(--accent-orange);">SM${index}</td>
+          <td style="font-weight: 500;">${name}</td>
+          <td style="color: var(--accent-green); font-size: 0.8rem;">${direction}</td>
+          <td style="font-family: monospace; color: var(--accent);">${startAddr}</td>
+          <td style="font-family: monospace;">${defaultSize} Bytes</td>
+          <td style="font-family: monospace;">${controlByte}</td>
+          <td><span style="color: ${enabled === 'Enabled' ? 'var(--accent-green)' : 'var(--text-muted)'}; font-weight: 600;">${enabled}</span></td>
+        </tr>
+      `;
+    });
+  }
+
+  function renderPdoBlocks(xml, pdoType, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const pdos = Array.from(xml.querySelectorAll(pdoType));
+
+    if (!pdos.length) {
+      container.innerHTML = '<p style="color:var(--text-muted)">No entries found.</p>';
+      return;
+    }
+
+    pdos.forEach(pdo => {
+      const pdoIdx = pdo.querySelector('Index')?.textContent || '';
+      const pdoName = pdo.querySelector('Name')?.textContent || 'Unnamed PDO';
+      const smAssigned = pdo.getAttribute('Sm');
+      const fixedAttr = pdo.getAttribute('Fixed');
+      const entries = Array.from(pdo.querySelectorAll('Entry'));
+
+      let currentBitOffset = 0;
+      let entriesHtml = '';
+
+      entries.forEach(entry => {
+        const name = entry.querySelector('Name')?.textContent || 'Reserved';
+        const index = entry.querySelector('Index')?.textContent || '0x0000';
+        const subIndex = entry.querySelector('SubIndex')?.textContent || '0';
+        const bitLen = parseInt(entry.querySelector('BitLen')?.textContent || '0', 10);
+        
+        const byteOffset = Math.floor(currentBitOffset / 8);
+        const hexOffset = '+0x' + byteOffset.toString(16).padStart(2, '0').toUpperCase();
+
+        entriesHtml += `
+          <div class="entry-box">
+            <div>
+              <span class="badge">${hexOffset}</span>
+              <strong style="margin-left: 6px;">${name}</strong>
+            </div>
+            <div style="font-family: monospace; color: var(--text-muted);">
+              ${index}:${subIndex} (${bitLen}b)
+            </div>
+          </div>
+        `;
+
+        currentBitOffset += bitLen;
+      });
+
+      const totalBytes = Math.ceil(currentBitOffset / 8);
+
+      let pdoSubMeta = [];
+      if (smAssigned !== null) pdoSubMeta.push(`Assigned to SM${smAssigned}`);
+      if (fixedAttr !== null) pdoSubMeta.push(fixedAttr === '1' ? 'Fixed Mapping' : 'Configurable');
+
+      const blockHtml = `
+        <div class="pdo-block">
+          <div class="pdo-header">
+            <span>${pdoName} (${pdoIdx})</span>
+            <span>Total: ${totalBytes} Bytes</span>
+          </div>
+          ${pdoSubMeta.length > 0 ? `<div class="pdo-sub-header">⚙ ${pdoSubMeta.join(' | ')}</div>` : ''}
+          <div class="entry-list">${entriesHtml}</div>
+        </div>
+      `;
+
+      container.innerHTML += blockHtml;
+    });
+  }
+
+  function renderObjects(xml) {
+    const tbody = document.getElementById('sdoTableBody');
+    tbody.innerHTML = '';
+    const objects = Array.from(xml.querySelectorAll('Objects Object'));
+
+    if (!objects.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted)">No Object Dictionary entries found.</td></tr>';
+      return;
+    }
+
+    objects.forEach(obj => {
+      const idx = obj.querySelector('Index')?.textContent || '-';
+      const name = obj.querySelector('Name')?.textContent || '-';
+      const type = obj.querySelector('Type')?.textContent || '-';
+      const bitSize = obj.querySelector('BitSize')?.textContent || '-';
+      const flags = obj.querySelector('Flags Access')?.textContent || '-';
+
+      const subItems = Array.from(obj.querySelectorAll('SubItem'));
+      
+      let parentDefault = '-';
+      if (subItems.length === 0) {
+        parentDefault = obj.querySelector('DefaultData')?.textContent || 
+                        obj.querySelector('DefaultValue')?.textContent || '-';
+      }
+
+      tbody.innerHTML += `
+        <tr style="${subItems.length > 0 ? 'font-weight: 600;' : ''}">
+          <td style="font-family: monospace; color: var(--accent);">${idx}</td>
+          <td>${name}</td>
+          <td style="font-family: monospace;">${type}</td>
+          <td>${bitSize ? bitSize + ' bits' : '-'}</td>
+          <td style="font-family: monospace; color: var(--accent-green);">${parentDefault}</td>
+          <td style="font-family: monospace;">${flags}</td>
+        </tr>
+      `;
+
+      if (subItems.length > 0) {
+        subItems.forEach((sub, subIndex) => {
+          const subName = sub.querySelector('Name')?.textContent || `SubIndex ${subIndex}`;
+          const subType = sub.querySelector('Type')?.textContent || '-';
+          const subBitSize = sub.querySelector('BitSize')?.textContent || '-';
+          const subFlags = sub.querySelector('Flags Access')?.textContent || '-';
+          const subDefault = sub.querySelector('DefaultData')?.textContent || 
+                             sub.querySelector('DefaultValue')?.textContent || '-';
+
+          tbody.innerHTML += `
+            <tr class="sub-item-row">
+              <td style="font-family: monospace; color: var(--text-muted); padding-left: 1.5rem;">
+                <span class="sub-tree-prefix">└─</span>0x${subIndex.toString(16).padStart(2, '0').toUpperCase()}
+              </td>
+              <td style="color: var(--text-muted); padding-left: 1rem;">${subName}</td>
+              <td style="font-family: monospace; color: var(--text-muted);">${subType}</td>
+              <td style="color: var(--text-muted);">${subBitSize !== '-' ? subBitSize + ' bits' : '-'}</td>
+              <td style="font-family: monospace; color: var(--accent-green);">${subDefault}</td>
+              <td style="font-family: monospace; color: var(--text-muted);">${subFlags}</td>
+            </tr>
+          `;
+        });
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
